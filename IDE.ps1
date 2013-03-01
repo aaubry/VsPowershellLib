@@ -1,7 +1,3 @@
-function Attach-WebServer {
-  $DTE.Debugger.LocalProcesses | Where { $_.Name.Contains("w3wp") } | ForEach-Object { $_.Attach() }
-}
-
 function Get-TypeAtCursor {
   $elementTypes = [EnvDTE.vsCMElement]::vsCMElementClass, [EnvDTE.vsCMElement]::vsCMElementStruct, [EnvDTE.vsCMElement]::vsCMElementInterface, [EnvDTE.vsCMElement]::vsCMElementEnum
   $elementTypes | ForEach-Object { $DTE.ActiveDocument.Selection.ActivePoint.CodeElement($_) } | Select-Object -First 1
@@ -25,7 +21,7 @@ function Get-Constructors {
 }
 
 function Format-Document {
-  $DTE.ExecuteCommand("Edit.FormatDocument")
+  $x = $DTE.ExecuteCommand("Edit.FormatDocument")
 }
 
 function Get-SolutionConfigurations()
