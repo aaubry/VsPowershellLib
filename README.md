@@ -4,8 +4,8 @@ A collection of powershell macros for Visual Studio.
 
 ## Installing
 
-* Clone the repository into **C:\Users\%your-user%\Documents\WindowsPowerShell**
-* Restart Visual Studio or execute the following command inside Package Manager Console:
+1. Clone the repository into **C:\Users\%your-user%\Documents\WindowsPowerShell**
+1. Restart Visual Studio or execute the following command inside Package Manager Console:
 `
 PM> . 'C:\Users\%your-user%\Documents\WindowsPowerShell\NuGet_profile.ps1'
 `
@@ -19,12 +19,12 @@ Inside the Package Manager Console, execute the functions that are available ins
 ### Move the current type to a file named after that type.
 
 1. Place the cursor inside the desired type.
-2. `PM> Move-TypeToOwnFile`
+1. `PM> Move-TypeToOwnFile`
 
 ### Add a constructor argument, a private field and initialize the field from the argument.
 
 1. Place the cursor inside the desired type.
-2. `PM> Add-Dependency IMyDependency`
+1. `PM> Add-Dependency IMyDependency`
 
 ### Delete a project configuration in every project in the solution
 
