@@ -1,3 +1,15 @@
+function Name-ToPascalCase {
+	param(
+		[parameter(Mandatory = $true)]
+		[string] $Name
+	)
+	
+	$Name = $Name.TrimStart('_')
+	$Name = [System.Text.RegularExpressions.Regex]::Replace($Name, "^([A-Z])", { param($m) $m.Value.ToLower() })
+	$Name = [System.Text.RegularExpressions.Regex]::Replace($Name, "[^\w]", "")
+	return $Name
+}
+
 function Add-Dependency {
   param(
     [parameter(Mandatory = $true)]
@@ -10,9 +22,7 @@ function Add-Dependency {
     $Name = [System.Text.RegularExpressions.Regex]::Match($Type, "^I?(\w+)").Groups[1].Value
   }
   
-  $Name = $Name.TrimStart('_')
-  $Name = [System.Text.RegularExpressions.Regex]::Replace($Name, "^([A-Z])", { param($m) $m.Value.ToLower() })
-  $Name = [System.Text.RegularExpressions.Regex]::Replace($Name, "[^\w]", "")
+  $Name = Name-ToPascalCase $Name
   
   if ($DTE.UndoContext.IsOpen) {
     $DTE.UndoContext.Close()
@@ -83,4 +93,37 @@ function Move-TypeToOwnFile() {
 	$DTE.UndoContext.Close()
 	
 	Format-Document
+}
+
+function Add-ConstructorFromPropertiesAndFields() {
+	$type = Get-TypeAtCursor
+
+	if ($DTE.UndoContext.IsOpen) {
+		$DTE.UndoContext.Close()
+	}
+	$DTE.UndoContext.Open("Move type to own file")
+
+	$InsertionIndex = ($type.Members | Take-While { $_.Kind -eq [EnvDTE.vsCMElement]::vsCMElementVariable -or $_.Kind -eq [EnvDTE.vsCMElement]::vsCMElementProperty } | Measure-Object).Count
+	$Constructor = $type.AddFunction($type.Name, [EnvDTE.vsCMFunction]::vsCMFunctionConstructor, [EnvDTE.vsCMTypeRef]::vsCMTypeRefVoid, $InsertionIndex, [EnvDTE.vsCMAccess]::vsCMAccessPublic)
+	
+	(Get-TypeAtCursor).Members |
+	? {
+		($_.Kind -eq [EnvDTE.vsCMElement]::vsCMElementProperty -and $_.Setter.Access -eq [EnvDTE.vsCMAccess]::vsCMAccessPrivate) -or
+		($_.Kind -eq [EnvDTE.vsCMElement]::vsCMElementVariable -and $_.IsConstant)
+	} | ? { $_.IsShared -eq $false } | % {
+	
+		$paramName = Name-ToPascalCase $_.Name
+		$Param = $Constructor.AddParameter($paramName, $_.Type, $Constructor.Parameters.Count)
+		#echo (Name-ToPascalCase $_.Name)
+		
+		$Pos = $Constructor.EndPoint.CreateEditPoint()
+		$Pos.LineUp()
+		$Pos.EndOfLine()
+		$Pos.Insert([Environment]::NewLine)
+		$Pos.Insert([String]::Format("			{0} = {1};", $_.Name, $paramName))
+	}
+	
+	$DTE.UndoContext.Close()
+
+	#Format-Document
 }

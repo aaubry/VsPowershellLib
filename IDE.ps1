@@ -1,3 +1,5 @@
+#Add-Type -Path "Helpers.dll"
+
 function Get-TypeAtCursor {
   $elementTypes = [EnvDTE.vsCMElement]::vsCMElementClass, [EnvDTE.vsCMElement]::vsCMElementStruct, [EnvDTE.vsCMElement]::vsCMElementInterface, [EnvDTE.vsCMElement]::vsCMElementEnum
   $elementTypes | ForEach-Object { $DTE.ActiveDocument.Selection.ActivePoint.CodeElement($_) } | Select-Object -First 1
@@ -21,7 +23,8 @@ function Get-Constructors {
 }
 
 function Format-Document {
-  $x = $DTE.ExecuteCommand("Edit.FormatDocument")
+	$DTE.ActiveDocument.Activate()
+	$x = $DTE.ExecuteCommand("Edit.FormatDocument")
 }
 
 function Get-SolutionConfigurations()
