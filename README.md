@@ -51,5 +51,7 @@ This assumes that the package version is stored in a file named '_Package.cs' wi
     internal static class Package
     {
         public const string Name = "MyPackage";
-        public const string Version = "2.0.24";
+		public const string Version_Major = "2";
+		public const string Version_Minor = "1";
+		public const string Version_Build = "0";
     }
