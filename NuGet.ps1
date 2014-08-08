@@ -94,6 +94,18 @@ function _Increment-PackageVersion_Internal($project, $Segment)
 	}
 }
 
+function Increment-AllPackageVersions()
+{
+	param(
+		[parameter()]
+		[ValidateSet('Major', 'Minor', 'Build')]
+		[string]
+		$Segment = 'Build'
+	)
+	
+	Get-Projects | % { Increment-PackageVersion $_.ProjectName -Segment $Segment -IgnoreDependencies }
+}
+
 function Increment-PackageVersion()
 {
 	param(
@@ -153,3 +165,6 @@ function Get-ProjectsWithIndirectReferencesTo() {
 	$indirectRefs = $directRefs | % { Get-ProjectsWithIndirectReferencesTo $_ $allReferences }
 	$indirectRefs, $directRefs | % { $_ } | Group-Object Name | % { $_.Group | Select-Object -First 1 }
 }
+
+
+
