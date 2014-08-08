@@ -33,6 +33,23 @@ function Downgrade-Package {
 	}
 }
 
+function Reinstall-Package {
+  param(
+    [parameter(Mandatory = $true)]
+    $Name,
+    [parameter(Mandatory = $true)]
+    $Version
+  )
+  
+  $projects = Get-Project -All |
+	select @{Name="ProjectName";Expression={$_.ProjectName}}, @{Name="Has";Expression={Get-Package $Name -Project $_.Name | ? { $_.Id -eq $Name -and $_.Version -eq $Version } }} |
+	? { $_.Has -ne $null } |
+	% {
+		Uninstall-Package $Name -ProjectName $_.ProjectName -Force
+		Install-Package $Name -Version $Version -ProjectName $_.ProjectName
+	}
+}
+
 function Get-PackageFromNugetOrg()
 {
 	param(
