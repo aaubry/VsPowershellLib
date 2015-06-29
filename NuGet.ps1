@@ -1,9 +1,61 @@
-function Delete-OldPackages {
-  dir packages | group {$([regex]::match($_.Name, '^(.*?)\.(\d+(\.\d+))').Groups[1].Value)} | where {$_.Count -gt 1} | foreach-object { echo $_.Group | sort-object Name -Descending | select -Skip 1 | remove-item -Recurse }
+function Delete-OldPackages(
+  [switch]$WhatIf,
+  [switch]$Confirm = $true
+) {
+  if($WhatIf) {
+    Get-OldPackages | % { "Deleting $($_.Id) $($_.Version)" }
+  } else {
+    Get-OldPackages | % { $_.File } | Remove-Item -Confirm:$Confirm -Recurse
+  }
 }
 
-function Update-PtCom {
-  get-package -Filter PTCom -Updates | update-package
+function Get-OldPackages() {
+  Get-ChildItem packages |
+    ? { $_.Name -match '^(.*?)\.(\d+(\.\d+)*(-.*)?)' } |
+    % {
+      @{
+        File = $_
+        Id = $Matches[1]
+        Version = $Matches[2]
+        SortableVersion = (Normalize-SemVer $Matches[2])
+      }
+    } |
+    Group-Object { $_.Id } |
+    ? { $_.Count -gt 1 } |
+    % {
+      $_.Group |
+        Sort-Object -Property @{Expression={$_.SortableVersion}} -Descending |
+        Select-Object -Skip 1 |
+        % {
+          New-Object PSObject -Property @{
+            Id = $_.Id
+            Version = $_.Version
+            File = $_.File
+          }
+        }
+    }
+}
+
+function Normalize-SemVer($Version) {
+  $isMatch = $Version -match '(?<num>\d+(?:\.\d+)*)(?:\-(?<pre>.*))?'
+  if(-not $isMatch) {
+    throw "Invalid version"
+  }
+
+  $numericParts = $Matches['num'].Split('.')
+
+  $normalized = ''
+  for($i = 0; $i -lt 6; $i++) {
+    $normalized = $normalized + ([int]('0' + $numericParts[$i])).ToString('0000000000')
+  }
+
+  if($Matches['pre']) {
+    $normalized = $normalized + $Matches['pre']
+  } else {
+    $normalized = $normalized + 'zzzzzzzzzz'
+  }
+
+  return $normalized
 }
 
 function Get-DuplicatePackages()
@@ -23,7 +75,7 @@ function Downgrade-Package {
     [parameter(Mandatory = $true)]
     $Version
   )
-  
+
   $projects = Get-Project -All |
 	select @{Name="ProjectName";Expression={$_.ProjectName}}, @{Name="Has";Expression={Get-Package $Name -Project $_.Name | ? { $_.Id -eq $Name -and $_.Version -ne $Version } }} |
 	? { $_.Has -ne $null } |
@@ -40,7 +92,7 @@ function Reinstall-Package {
     [parameter(Mandatory = $true)]
     $Version
   )
-  
+
   $projects = Get-Project -All |
 	select @{Name="ProjectName";Expression={$_.ProjectName}}, @{Name="Has";Expression={Get-Package $Name -Project $_.Name | ? { $_.Id -eq $Name -and $_.Version -eq $Version } }} |
 	? { $_.Has -ne $null } |
@@ -70,16 +122,16 @@ function _Increment-PackageVersion_Internal($project, $Segment)
 
 	$x = $packageSpecItem.Open()
 	$packageSpecDoc = $packageSpecItem.Document
-	
+
 	# Open file in editor
 	$packageSpecPath = $packageSpecDoc.FullName
 	$x = $DTE.ItemOperations.OpenFile($packageSpecPath)
-	
+
 	$members = $packageSpecItem.FileCodeModel.CodeElements.Item('Package').Members
 	$maj = $members.Item('Version_Major')
 	$min = $members.Item('Version_Minor')
 	$bld = $members.Item('Version_Build')
-	
+
 	if($Segment -eq 'Major') {
 		$maj.InitExpression = '"' + ([int]$maj.InitExpression.Trim('"') + 1) + '"'
 		$min.InitExpression = '"0"'
@@ -102,7 +154,7 @@ function Increment-AllPackageVersions()
 		[string]
 		$Segment = 'Build'
 	)
-	
+
 	Get-Projects | % { Increment-PackageVersion $_.ProjectName -Segment $Segment -IgnoreDependencies }
 }
 
@@ -112,16 +164,16 @@ function Increment-PackageVersion()
 		[parameter(Mandatory = $true)]
 		[string]
 		$ProjectName,
-		
+
 		[parameter()]
 		[ValidateSet('Major', 'Minor', 'Build')]
 		[string]
 		$Segment = 'Build',
-		
+
 		[switch]
 		$IgnoreDependencies
 	)
-	
+
 	if ($DTE.UndoContext.IsOpen) {
 		$DTE.UndoContext.Close()
 	}
@@ -129,11 +181,11 @@ function Increment-PackageVersion()
 
 	$project = Get-Project -Name $ProjectName.TrimStart('.', '\')
 	_Increment-PackageVersion_Internal $project $Segment $IgnoreDependencies $allReferences
-	
+
 	if(-not $IgnoreDependencies) {
 		Get-ProjectsWithIndirectReferencesTo $project | % { _Increment-PackageVersion_Internal $_ 'Build' }
 	}
-	
+
 	$DTE.UndoContext.Close()
 }
 
@@ -146,7 +198,7 @@ function Get-ProjectsWithDirectReferencesTo() {
 	param(
 		[parameter(Mandatory = $true)]
 		$project,
-		
+
 		$allReferences = (Get-AllProjectReferences)
 	)
 
@@ -157,7 +209,7 @@ function Get-ProjectsWithIndirectReferencesTo() {
 	param(
 		[parameter(Mandatory = $true)]
 		$project,
-		
+
 		$allReferences = (Get-AllProjectReferences)
 	)
 
@@ -165,6 +217,3 @@ function Get-ProjectsWithIndirectReferencesTo() {
 	$indirectRefs = $directRefs | % { Get-ProjectsWithIndirectReferencesTo $_ $allReferences }
 	$indirectRefs, $directRefs | % { $_ } | Group-Object Name | % { $_.Group | Select-Object -First 1 }
 }
-
-
-
