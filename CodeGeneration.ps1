@@ -38,7 +38,7 @@ function Add-Dependency {
     $Constructor = $CodeElement.AddFunction($CodeElement.Name, [EnvDTE.vsCMFunction]::vsCMFunctionConstructor, [EnvDTE.vsCMTypeRef]::vsCMTypeRefVoid, $InsertionIndex, [EnvDTE.vsCMAccess]::vsCMAccessPublic)
   }
   
-  $Field = $CodeElement.AddVariable("_" + $Name, $Type, $InsertionIndex, [EnvDTE.vsCMAccess]::vsCMAccessPrivate)
+  $Field = $CodeElement.AddVariable("" + $Name, $Type, $InsertionIndex, [EnvDTE.vsCMAccess]::vsCMAccessPrivate)
   $Pos = $Field.StartPoint.CreateEditPoint()
   $Pos.CharRight("private".Length)
   $Pos.Insert(" readonly")
@@ -49,7 +49,7 @@ function Add-Dependency {
   $Pos.LineUp()
   $Pos.EndOfLine()
   $Pos.Insert([Environment]::NewLine)
-  $Pos.Insert([String]::Format("			_{0} = {0};", $Name))
+  $Pos.Insert([String]::Format("			this.{0} = {0};", $Name))
   
   #Format-Document
   
