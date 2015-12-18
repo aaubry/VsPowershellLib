@@ -1,15 +1,16 @@
 function Delete-OldPackages(
+  [string]$Name = $null,
   [switch]$WhatIf,
   [switch]$Confirm = $true
 ) {
   if($WhatIf) {
-    Get-OldPackages | % { "Deleting $($_.Id) $($_.Version)" }
+    Get-OldPackages $Name | % { "Deleting $($_.Id) $($_.Version)" }
   } else {
-    Get-OldPackages | % { $_.File } | Remove-Item -Confirm:$Confirm -Recurse
+    Get-OldPackages $Name | % { $_.File } | Remove-Item -Confirm:$Confirm -Recurse
   }
 }
 
-function Get-OldPackages() {
+function Get-OldPackages([string]$Name = $null) {
   Get-ChildItem packages |
     ? { $_.Name -match '^(.*?)\.(\d+(\.\d+)*(-.*)?)' } |
     % {
@@ -20,6 +21,7 @@ function Get-OldPackages() {
         SortableVersion = (Normalize-SemVer $Matches[2])
       }
     } |
+    ? { $Name -eq $null -or $_.Id -match $Name } |
     Group-Object { $_.Id } |
     ? { $_.Count -gt 1 } |
     % {
@@ -216,4 +218,121 @@ function Get-ProjectsWithIndirectReferencesTo() {
 	$directRefs = Get-ProjectsWithDirectReferencesTo $project $allReferences
 	$indirectRefs = $directRefs | % { Get-ProjectsWithIndirectReferencesTo $_ $allReferences }
 	$indirectRefs, $directRefs | % { $_ } | Group-Object Name | % { $_.Group | Select-Object -First 1 }
+}
+
+function Get-Instance() {
+  param(
+		[parameter(Mandatory = $true)]
+    [type]
+		$ServiceType
+  )
+
+  [System.Type]::GetType("NuGet.VisualStudio.ServiceLocator, NuGet.VisualStudio").GetMethod("GetInstance").MakeGenericMethod($ServiceType).Invoke($null, $null)
+}
+
+function Update-PackageQuickly() {
+  param(
+		[parameter(Mandatory = $true)]
+    [string]
+		$Id,
+
+    [parameter(Mandatory = $true)]
+    [string]
+		$Version,
+
+    [switch]
+		$WhatIf
+	)
+
+  $packageRepositoryFactory = Get-Instance ([NuGet.IPackageRepositoryFactory])
+  $packageSourceProvider = Get-Instance ([NuGet.VisualStudio.IVsPackageSourceProvider])
+  $remotePackageRepository = $packageRepositoryFactory.CreateRepository($packageSourceProvider.ActivePackageSource.Source)
+  $package = $remotePackageRepository.FindPackage($Id, $Version)
+  if($package -eq $null) {
+    throw "Could not find package $Id $Version in current package source"
+  }
+
+  Write-Host "Downloading package..."
+  $packagesDir = [System.IO.Path]::Combine([System.IO.Path]::GetDirectoryName($DTE.Solution.FileName), "packages")
+  $localPackageRepository = New-Object "NuGet.LocalPackageRepository" -ArgumentList $packagesDir, false
+  if(-not $WhatIf) {
+    $localPackageRepository.AddPackage($package)
+  }
+
+  Write-Host "Installing package..."
+  $localFileSystem = New-Object "NuGet.PhysicalFileSystem" -ArgumentList $packagesDir
+  if(-not $WhatIf) {
+    $localFileSystem.AddFiles($package.GetFiles(), $localPackageRepository.PathResolver.GetPackageDirectory($package))
+  }
+
+  Write-Host "Updating projects..."
+  $projectsWithPackages = Get-Projects -IncludeSolutionFolders |
+    % {
+      $packagesConfig = $_.ProjectItems |
+        ? { $_.Name -eq "packages.config" }
+
+      echo @{
+        "Project" = $_
+        "PackagesConfig" = $packagesConfig
+      }
+    } |
+    ? { $_.PackagesConfig -ne $null }
+
+  $oldPackageDirs = New-Object "System.Collections.ArrayList"
+  $projectsWithPackages | Select-Object |
+    % {
+      $packagesConfigPath = $_.PackagesConfig.FileNames(1)
+      [xml]$metadata = Get-Content $packagesConfigPath
+
+      $packageReference = $metadata.packages.package | ? { $_.id -eq $Id }
+      if($packageReference -ne $null) {
+        $currentVersion = $packageReference.version
+        Write-Host ""
+        Write-Host "  $($_.Project.Name)"
+        Write-Host "    current version: $currentVersion"
+
+        Write-Host "    updating packages.config"
+        $packageReference.version = $Version
+        if(-not $WhatIf) {
+          $metadata.Save($packagesConfigPath)
+        }
+
+        $references = $_.Project.Object.References
+        if($references -ne $null) {
+          $oldPackageDir = [System.IO.Path]::Combine($packagesDir, $Id) + "." + $currentVersion + [System.IO.Path]::DirectorySeparatorChar
+          $newPackageDir = [System.IO.Path]::Combine($packagesDir, $Id) + "." + $Version + [System.IO.Path]::DirectorySeparatorChar
+          $x = $oldPackageDirs.Add($oldPackageDir)
+
+          Write-Host "    updating references"
+          $references |
+            ? { $_.Path.StartsWith($oldPackageDir, [System.StringComparison]::InvariantCultureIgnoreCase) } |
+            % {
+              $oldReferencePath = $_.Path
+              $newReferencePath = $oldReferencePath.Replace($oldPackageDir, $newPackageDir)
+
+              Write-Host "      removing reference to $($oldReferencePath.Replace($packagesDir + [System.IO.Path]::DirectorySeparatorChar, ''))"
+              if(-not $WhatIf) {
+                $_.Remove()
+              }
+
+              Write-Host "      adding reference to $($newReferencePath.Replace($packagesDir + [System.IO.Path]::DirectorySeparatorChar, ''))"
+              if(-not $WhatIf) {
+                $x = $references.Add($newReferencePath)
+              }
+            }
+        }
+      }
+    }
+
+  Write-Host ""
+  Write-Host "...done"
+
+  Write-Host "Cleaning up..."
+  $oldPackageDirs | % {
+    if(-not $WhatIf -and (Test-Path $_)) {
+      Remove-Item $_ -Recurse
+    }
+  }
+
+  Write-Host "Package $Id $Version was successfully updated"
 }

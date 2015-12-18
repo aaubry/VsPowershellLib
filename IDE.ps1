@@ -10,7 +10,7 @@ function Get-Functions {
     [parameter(Mandatory = $true)]
     $Type
   )
-  
+
   $Type.Members | Where { $_.Kind -eq [EnvDTE.vsCMElement]::vsCMElementFunction }
 }
 
@@ -38,23 +38,24 @@ function Get-SolutionConfigurations()
 function Get-Projects()
 {
   param(
-    $Container = $DTE.Solution.Projects
+    $Container = $DTE.Solution.Projects,
+    [switch] $IncludeSolutionFolders
   )
-  
+
   $Container | Foreach-Object {
-    
+
     $project = $_
     if($project.Type -eq $null -and $project.SubProject -ne $null) {
       $project = $project.SubProject
     }
-    
-    if($project.Type -ne "Unknown" -and $project.Type -ne $null)
+
+    if($IncludeSolutionFolders -or ($project.Type -ne "Unknown" -and $project.Type -ne $null))
     {
       echo $project
     }
 
     $_.ProjectItems | Where-Object { $_.SubProject -ne $null } | ForEach-Object { Get-Projects $_ }
-    
+
   }
 }
 

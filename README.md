@@ -38,7 +38,7 @@ Inside the Package Manager Console, execute the functions that are available ins
 
 1. `Downgrade-Package SixPack 1.2.3`
 
-This will uninstall any installed package named 'SixPack' with a version number greater than '1.2.3'. And install that version instead. 
+This will uninstall any installed package named 'SixPack' with a version number greater than '1.2.3'. And install that version instead.
 
 ### Increment the package version number of the specified project and the minor version of all dependent packages
 
@@ -55,3 +55,15 @@ This assumes that the package version is stored in a file named '_Package.cs' wi
 		public const string Version_Minor = "1";
 		public const string Version_Build = "0";
     }
+
+### Update a NuGet package quickly
+
+1. `PM> Update-PackageQuickly SixPack 1.2.36`
+
+This command is simmilar to the [Update-Package](https://docs.nuget.org/consume/package-manager-console-powershell-reference#update-package) command, except that it is much quicker to run. It does **NOT** perform the following:
+
+* Validate dependencies
+* Update dependent packages
+* Run install scripts
+
+Use this command only if you know what you are doing.
