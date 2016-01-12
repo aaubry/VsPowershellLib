@@ -4,7 +4,10 @@ A collection of powershell macros for Visual Studio.
 
 ## Installing
 
-1. Clone the repository into **%userprofile%\Documents\WindowsPowerShell**
+1. Clone the repository into **%userprofile%\Documents\WindowsPowerShell**  
+   ```
+   C:\> git clone https://github.com/aaubry/VsPowershellLib.git %userprofile%\Documents\WindowsPowerShell
+   ```
 1. Restart Visual Studio or execute the following command inside Package Manager Console:
 `
 PM> . '%userprofile%\Documents\WindowsPowerShell\NuGet_profile.ps1'
