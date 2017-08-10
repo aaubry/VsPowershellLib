@@ -10,7 +10,7 @@ A collection of powershell macros for Visual Studio.
    ```
 1. Restart Visual Studio or execute the following command inside Package Manager Console:  
    ```
-   PM> . '%userprofile%\Documents\WindowsPowerShell\NuGet_profile.ps1'
+   PM> . "$($env:userprofile)\Documents\WindowsPowerShell\NuGet_profile.ps1"
    ```
 
 ## Usage
